@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="http://vuejs.org/js/vue.min.js"></script>
+  
+  
+  <style>[v-cloak]{display:none;}</style>
+  <title>todos</title>
+</head>
+<body>
+   <section id="todoapp">
+    <!--enter the new To,do thing. -->
+    <header id ="myApp">
+      
+      <h1>todos</h1>
+      <input id="new-todo"
+             placeholder="what is new Thing?"
+             v-model="newTodo"
+             v-on="keyup:addTodo | key enter">
+      </header>
+     
+    <section id ="main" 
+             v-show="todos.length" 
+             v-cloak>    
+      <input id="toggle-all"
+             type="checkbox"
+             v-model="alldone">
+      <ul id="todo-list">
+        <li class="todo" 
+            v-repeat="todos | filterTodo" 
+            v-class="completed: completed,
+                     editing: this==editedTodo
+                     ">
+          <div class="view">
+            <input class="toggle"
+                   type="checkbox"
+                   v-model="completed"
+                            >
+<label v-text="title" 
+       v-on="dblclick: editTodo(this)">
+ </label>
+<button class="destroy" 
+        v-on="click: removeTodo(this)"></button>
+</div>
+<input class="edit"
+       type="text"
+       v-model="title"
+       v-todo-focus="this == editedTodo"
+       v-on="blur  : doneEdit(this),
+      keyup : doneEdit(this) | key enter,
+      keyup : cancelEdit(this) | key esc">
+</li>
+   </ul>
+      </section>
+ 
+     
+</section> 
+ <script>
+            var isPhantom = navigator.userAgent.indexOf('PhantomJS') > -1
+            if (isPhantom) {
+                localStorage.clear()
+            } else {
+                var now = window.performance && window.performance.now
+                    ? function () { return window.performance.now() }
+                    : Date.now
+                var metrics = { beforeLoad: now() }
+            }
+        </script>
+        <script src="vue.js"></script>
+        <script>metrics.afterRender = now()</script>
+        <script src="perf.js"></script>
+        <script>metrics.afterLoad = now()</script>
+        <script src="director.js"></script>
+
+
+
+
+
+  <script> 
+    (function (exports) {
+   
+    var STORAGE_KEY = 'todos-vuejs';
+
+    exports.todoStorage = {
+        fetch: function () {
+            return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        },
+        save: function (todos) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(todos));
+        }
+    };
+   
+   
+ exports.app = new Vue({
+  el:'#todoapp',
+  data:{
+     
+    todos:todoStorage.fetch(),
+    newTodo:"",
+    editedTodo:null,
+    activeFilter: 'all',
+    filters:{
+       all: function () {
+               return true;
+                },
+       active: function (todo) {
+                    return !todo.completed;
+                },
+       completed:function(todo){
+            return todo.completed;
+           } 
+     }
+   },
+    directives: {
+            'todo-focus': function (value) {
+                if (!value) {
+                    return;
+                }
+                var el = this.el;
+                setTimeout(function () {
+                    el.focus();
+                }, 0);
+            }
+        },
+
+        filters:{
+      filterTodo:function(todos){
+        return todos.filter(this.filters[this.activeFilter]);
+      }
+    },
+    
+   ready: function () {
+            this.$watch('todos', function (todos) {
+                todoStorage.save(todos);
+            }, true);
+        },
+
+   methods:{
+      addTodo:function(){
+      
+      var value=this.newTodo && this.newTodo.trim();
+      if(!value){
+        alert("Please inter the todos!");
+        
+        return;
+      }
+     
+      this.todos.push({ title: value, completed:false });
+      console.log(this.todos);
+      
+      this.newTodo='';
+      
+       },
+    
+      editTodo:function(todo){
+      this.editedTodo = todo;
+      },
+    
+      removeTodo:function(todo){
+      this.todos.$remove(todo.$data);
+      },
+    
+      doneEdit: function (todo) {
+                if (!this.editedTodo) {
+                    return;
+                }
+                this.editedTodo = null;
+                todo.title = todo.title.trim();
+                if (!todo.title) {
+                    this.removeTodo(todo);
+                }
+            },
+      cancelEdit: function (todo) {
+                this.editedTodo = null;
+                todo.title = this.beforeEditCache;
+            },
+     removeCompleted: function () {
+                this.todos = this.todos.filter(this.filters.active);
+            }
+    
+    },
+  
+
+
+   
+   computed:{
+            remaining:function(){
+        return  this.todos.filter(this.filters.active).length;
+      },
+   
+     alldone:{
+        get:function(){
+          return this.remaining === 0;
+        },
+        
+        set:function(value){
+         for(var i=0;i<this.todos.length;i++)
+           {
+             this.todos[i].completed= value;
+           }
+         }
+      }
+    }
+
+});
+
+   
+
+})(window);
+  </script>
+  
+</body>
+</html>

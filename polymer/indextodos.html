@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="en" data-framework="polymer">
+	<head>
+		<meta charset="utf-8">
+		<title>Polymer • TodoMVC</title>
+		<!-- <script src="http://cdnjs.cloudflare.com/ajax/libs/polymer/0.3.4/platform.js"></script>    
+		    <script src="http://cdnjs.cloudflare.com/ajax/libs/polymer/0.3.4/polymer.js">
+			
+		    </script> -->
+      
+<script src="https://www.polymer-project.org/webcomponents.min.js?20141119"></script>
+<!-- TODO: remove when https://github.com/Polymer/polymer/issues/391 is fixed -->
+<link rel="import" href="https://www.polymer-project.org/components/polymer/polymer.html">
+
+
+  <link rel="import" href="https://www.polymer-project.org/elements/common_elements.vulcanized.html?20141119">
+
+
+		<link rel="stylesheet" href="app/app.css" shim-shadowdom>
+		<script src="bower_components/platform/platform.js"></script>
+		<link rel="import" href="bower_components/core-localstorage/core-localstorage.html">
+		<link rel="import" href="../polymer/polymer.html">
+		<!-- <link rel="import" href="elements/td-model.html">
+
+		<link rel="import" href="elements/td-todos.html"> -->
+		
+
+	</head>
+	<body>
+		<header>
+			<h1>todos</h1>
+		</header>
+<polymer-element name="core-localstorage" attributes="name value useRaw autoSaveDisabled" hidden>
+<script>
+
+  Polymer('core-localstorage', {
+
+    /**
+     * Fired when a value is loaded from localStorage.
+     * @event core-localstorage-load
+     */
+
+    /**
+     * The key to the data stored in localStorage.
+     *
+     * @attribute name
+     * @type string
+     * @default null
+     */
+    name: '',
+
+    /**
+     * The data associated with the specified name.
+     *
+     * @attribute value
+     * @type object
+     * @default null
+     */
+    value: null,
+
+    /**
+     * If true, the value is stored and retrieved without JSON processing.
+     *
+     * @attribute useRaw
+     * @type boolean
+     * @default false
+     */
+    useRaw: false,
+
+    /**
+     * If true, auto save is disabled.
+     *
+     * @attribute autoSaveDisabled
+     * @type boolean
+     * @default false
+     */
+    autoSaveDisabled: false,
+
+    attached: function() {
+      // wait for bindings are all setup
+      this.async('load');
+    },
+
+    valueChanged: function() {
+      if (this.loaded && !this.autoSaveDisabled) {
+        this.save();
+      }
+    },
+
+    load: function() {
+      var v = localStorage.getItem(this.name);
+      if (this.useRaw) {
+        this.value = v;
+      } else {
+        // localStorage has a flaw that makes it difficult to determine
+        // if a key actually exists or not (getItem returns null if the
+        // key doesn't exist, which is not distinguishable from a stored
+        // null value)
+        // however, if not `useRaw`, an (unparsed) null value unambiguously
+        // signals that there is no value in storage (a stored null value would
+        // be escaped, i.e. "null")
+        // in this case we save any non-null current (default) value
+        if (v === null) {
+          if (this.value !== null) {
+            this.save();
+          }
+        } else {
+          try {
+            v = JSON.parse(v);
+          } catch(x) {
+          }
+          this.value = v;
+        }
+      }
+      this.loaded = true;
+      this.asyncFire('core-localstorage-load');
+    },
+
+    /**
+     * Saves the value to localStorage.
+     *
+     * @method save
+     */
+    save: function() {
+      var v = this.useRaw ? this.value : JSON.stringify(this.value);
+      localStorage.setItem(this.name, v);
+    }
+
+  });
+
+</script>
+
+</polymer-element>
+
+
+<polymer-element name="td-model" attributes="filter items storageId">
+<template>
+	
+</template>
+<script>
+		Polymer('td-model', {
+			filtered: null,
+			completedCount: 0,
+			activeCount: 0,
+			allCompleted: false,
+			ready: function() {
+				this.asyncMethod(function() {
+					this.items = this.storage.value || [];
+				});
+			},
+			filterChanged: function() {
+				this.asyncMethod(function() {
+					this.filterItems();
+				});
+			},
+			itemsChanged: function() {
+				this.completedCount = this.items.filter(this.filters.completed).length;
+				this.activeCount = this.items.length - this.completedCount;
+				this.allCompleted = this.completedCount && !this.activeCount;
+				this.filterItems();
+				if (this.storage) {
+					this.storage.value = this.items;
+					this.storage.save();
+				}
+			},
+			storageIdChanged: function() {
+				this.storage = document.querySelector('#' + this.storageId);
+				if (this.storage) {
+					this.items = this.storage.value;
+				}
+			},
+			filterItems: function() {
+				var fn = this.filters[this.filter];
+				this.filtered = fn ? this.items.filter(fn) : this.items;
+			},
+			newItem: function(title) {
+				title = String(title).trim();
+				if (title) {
+					var item = {
+						title: title,
+						completed: false
+					};
+					this.items.push(item);
+					this.itemsChanged();
+				}
+			},
+			destroyItem: function(item) {
+				var i = this.items.indexOf(item);
+				if (i >= 0) {
+					this.items.splice(i, 1);
+				}
+				this.itemsChanged();
+			},
+			clearItems: function (){
+				this.items = this.items.filter(this.filters.active);
+			},
+			setItemsCompleted: function(completed) {
+				this.items.forEach(function(item) {
+					item.completed = completed;
+				});
+				this.itemsChanged();
+			},
+			filters: {
+				active: function(item) {
+					return !item.completed;
+				},
+				completed: function(item) {
+					return item.completed;
+				}
+			}
+	 });
+	</script>
+
+
+</polymer-element>
+
+
+<polymer-element name="td-input" extends="input" on-keyup="{{keyupAction}}" on-keypress="{{keypressAction}}">
+	<script>
+		(function() {
+			var ENTER_KEY = 13;
+			var ESC_KEY = 27;
+			Polymer('td-input', {
+				keypressAction: function(e, detail, sender) {
+					// Listen for enter on keypress but esc on keyup, because
+					// IE doesn't fire keyup for enter.
+					if (e.keyCode === ENTER_KEY) {
+						this.fire('td-input-commit');
+					}
+				},
+				keyupAction: function(e, detail, sender) {
+					if (e.keyCode === ESC_KEY) {
+						this.fire('td-input-cancel');
+					}
+				}
+			});
+		})();
+	</script>
+</polymer-element>
+<polymer-element name="td-item" extends="li" attributes="item editing" on-blur="{{commitAction}}">
+	<template>
+		<link rel="stylesheet" href="elements/td-item.css">
+		<div class="view {{ {completed: item.completed, editing: editing} | tokenList }}" hidden?="{{editing}}" on-dblclick="{{editAction}}">
+			<input type="checkbox" class="toggle" checked="{{item.completed}}" on-click="{{itemChangeAction}}">
+			<label>{{item.title}}</label>
+			<button class="destroy" on-click="{{destroyAction}}"></button>
+		</div>
+		<input is="td-input" id="edit" class="edit" value="{{item.title}}" hidden?="{{!editing}}" on-td-input-commit="{{commitAction}}" on-td-input-cancel="{{cancelAction}}">
+	</template>
+	<script>
+		(function() {
+			Polymer('td-item', {
+				editing: false,
+				editAction: function() {
+					this.editing = true;
+					// schedule focus for the end of microtask, when the input will be visible
+					this.asyncMethod(function() {
+						this.$.edit.focus();
+					});
+				},
+				commitAction: function() {
+					if (this.editing) {
+						this.editing = false;
+						this.item.title = this.item.title.trim();
+						if (this.item.title === '') {
+							this.destroyAction();
+						}
+						this.fire('td-item-changed');
+					}
+				},
+				cancelAction: function() {
+					this.editing = false;
+				},
+				itemChangeAction: function() {
+					this.fire('td-item-changed');
+				},
+				destroyAction: function() {
+					this.fire('td-destroy-item', this.item);
+				}
+			});
+		})();
+	</script>
+</polymer-element>
+
+<polymer-element name="td-todos" attributes="route modelId">
+
+<template>
+		<link rel="stylesheet" href="elements/td-todos.css">
+		<flatiron-director route="{{route}}"></flatiron-director>
+		<section id="todoapp">
+			<header id="header">
+				<input is="td-input" id="new-todo" placeholder="What needs to be done?" autofocus on-td-input-commit="{{addTodoAction}}" on-td-input-cancel="{{cancelAddTodoAction}}">
+			</header>
+			<section id="main" hidden?="{{model.items.length == 0}}">
+				<input id="toggle-all" type="checkbox" on-change="{{toggleAllCompletedAction}}" checked="{{model.allCompleted}}">
+				<label for="toggle-all">Mark all as complete</label>
+				<ul id="todo-list" on-td-item-changed="{{itemChangedAction}}" on-td-destroy-item="{{destroyItemAction}}">
+					<template repeat="{{model.filtered}}">
+						<li is="td-item" item="{{}}"></li>
+					</template>
+				</ul>
+			</section>
+			<footer id="footer" hidden?="{{model.items.length == 0}}">
+				<span id="todo-count"><strong>{{model.activeCount}}</strong> {{model.activeCount == 1 ? 'item' : 'items'}} left</span>
+				<core-selector id="filters" selected="{{route || 'all'}}">
+					<li name="all">
+						<a href="../#/">All</a>
+					</li>
+					<li name="active">
+						<a href="../#/active">Active</a>
+					</li>
+					<li name="completed">
+						<a href="../#/completed">Completed</a>
+					</li>
+				</core-selector>
+				<button hidden?="{{model.completedCount == 0}}" id="clear-completed" on-click="{{clearCompletedAction}}">Clear completed ({{model.completedCount}})</button>
+			</footer>
+		</section>
+	</template>
+
+	<script>
+		(function() {
+			var ENTER_KEY = 13;
+			var ESC_KEY = 27;
+			Polymer('td-todos', {
+				modelIdChanged: function() {
+					this.model = document.querySelector('#' + this.modelId);
+				},
+				routeChanged: function() {
+					if (this.model) {
+						this.model.filter = this.route;
+					}
+				},
+				addTodoAction: function() {
+					this.model.newItem(this.$['new-todo'].value);
+					// when polyfilling Object.observe, make sure we update immediately
+					Platform.flush();
+					this.$['new-todo'].value = '';
+				},
+				cancelAddTodoAction: function() {
+					this.$['new-todo'].value = '';
+				},
+				itemChangedAction: function() {
+					if (this.model) {
+						this.model.itemsChanged();
+					}
+				},
+				destroyItemAction: function(e, detail) {
+					this.model.destroyItem(detail);
+				},
+				toggleAllCompletedAction: function(e, detail, sender) {
+					this.model.setItemsCompleted(sender.checked);
+				},
+				clearCompletedAction: function() {
+					this.model.clearItems();
+				}
+			});
+		})();
+	</script>
+</polymer-element>	
+
+
+
+
+		<core-localstorage id="storage" name="todos-polymer"></core-localstorage>
+		<td-model id="model" storageId="storage"></td-model>
+		<td-input ></td-input>
+		<td-item></td-item>
+		<td-todos modelId="model"></td-todos>
+		<footer id="info">
+			<p>Double-click to edit a todo</p>
+			<p>Created by <a href="http://www.polymer-project.org">The Polymer Authors</a></p>
+			<p>Part of <a href="http://todomvc.com">TodoMVC</a></p>
+		</footer>
+		<script src="bower_components/todomvc-common/base.js"></script>
+	</body>
+</html>
